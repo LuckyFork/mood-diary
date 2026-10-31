@@ -10,7 +10,9 @@
   let personal = loaded.state;
   let demo = false, sample = null, currentView = 'record', days = 7, selectedMood = null;
   let selectedTriggers = new Set(), editingId = null, historyLimit = 20, triggerFilter = '';
-  let activity = null, ticker = null, toastTimer = null, undo = null, savedPersonalDraft = null;
+  let activity = null, pendingAudio = null, activityRequest = 0, ticker = null, toastTimer = null, undo = null, savedPersonalDraft = null;
+  let lastSaveError = '', writing = false;
+  const writeLock = task => navigator.locks ? navigator.locks.request('mood-diary-v2-write', task) : Promise.resolve().then(task);
   const currentState = () => demo ? sample : personal;
   const clockText = seconds => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
 
@@ -22,12 +24,23 @@
     toastTimer = setTimeout(() => { $('toast').hidden = true; if (allowUndo) undo = null; }, allowUndo ? 10000 : 5000);
   }
 
-  function persist(next) {
+  async function persist(next) {
     if (demo) { sample = C.normalizeState(next); return true; }
+    if (writing) { lastSaveError = '正在保存上一项操作，请稍候再试。'; return false; }
     if (loaded.error) { toast('本地数据暂时无法读取，请先处理页面上方的提示。'); return false; }
-    const result = C.saveState(storage, next);
-    if (!result.ok) { toast(result.error); return false; }
+    const revision = loaded.revision;
+    writing = true;
+    let result;
+    try { result = await writeLock(() => C.saveState(storage, next, revision)); }
+    catch { result = { ok: false, error: '保存暂时不可用，输入已保留，请重试。' }; }
+    finally { writing = false; }
+    if (!result.ok) {
+      if (result.conflict) { loaded = C.loadState(storage); if (!loaded.error) personal = loaded.state; undo = null; renderAll(); }
+      lastSaveError = result.error;
+      toast(result.error); return false;
+    }
     personal = result.state;
+    loaded.revision = result.revision;
     return true;
   }
 
@@ -64,7 +77,7 @@
       updateForm(); renderCare();
     });
     $('intensity').addEventListener('input', () => { updateForm(); renderCare(); });
-    $('note').addEventListener('input', () => { $('noteCount').textContent = $('note').value.length + ' / 2000'; });
+    $('note').addEventListener('input', () => { $('noteCount').textContent = $('note').value.length + ' / ' + $('note').maxLength; });
   }
 
   function updateForm() {
@@ -72,7 +85,7 @@
     document.querySelectorAll('[data-tag]').forEach(button => button.setAttribute('aria-pressed', String(selectedTriggers.has(button.dataset.tag))));
     $('intensityValue').innerHTML = escape($('intensity').value) + ' <span>/ 5</span>';
     $('intensity').setAttribute('aria-valuetext', '强度 ' + $('intensity').value + '，满分 5');
-    $('noteCount').textContent = $('note').value.length + ' / 2000';
+    $('noteCount').textContent = $('note').value.length + ' / ' + $('note').maxLength;
     $('recordTitle').textContent = editingId ? '修改留给自己的记录' : '此刻，你的感受是？';
     $('saveRecord').innerHTML = editingId ? '保存修改' : '<span aria-hidden="true">＋</span> 保存这一刻';
     $('cancelEdit').hidden = !editingId;
@@ -99,11 +112,12 @@
     editingId = value?.editingId || null;
     $('intensity').value = value?.intensity || 3;
     $('note').value = value?.note || '';
+    $('note').maxLength = Math.max(2000, $('note').value.length);
     $('formError').hidden = true;
     updateForm(); renderCare();
   }
 
-  $('journalForm').addEventListener('submit', event => {
+  $('journalForm').addEventListener('submit', async event => {
     event.preventDefault();
     if (!selectedMood) {
       $('formError').textContent = '先选一个此刻的感受吧，其他内容都可以留空。';
@@ -115,7 +129,7 @@
     if (editingId && !previous) { $('formError').textContent = '这条记录已不存在，请取消编辑后重新记录。'; $('formError').hidden = false; return; }
     const nextEntry = { id: previous?.id || uid(), mood: selectedMood, intensity: Number($('intensity').value), triggers: [...selectedTriggers], note: $('note').value.trim(), ts: previous?.ts || Date.now() };
     const next = { ...currentState(), entries: previous ? currentState().entries.map(e => e.id === previous.id ? nextEntry : e) : [nextEntry, ...currentState().entries] };
-    if (!persist(next)) { $('formError').textContent = '这次还没有保存成功。输入已保留，请重试，或从数据管理导出现有记录。'; $('formError').hidden = false; return; }
+    if (!await persist(next)) { $('formError').textContent = lastSaveError || '这次还没有保存成功。输入已保留，请重试，或从数据管理导出现有记录。'; $('formError').hidden = false; return; }
     const edited = !!previous;
     restoreDraft(null);
     renderAll();
@@ -199,6 +213,7 @@
   }
 
   function toggleSample() {
+    if (writing) { toast('正在保存，请稍候再切换模式。'); return; }
     stopActivity();
     undo = null; $('toast').hidden = true;
     if (!demo) { savedPersonalDraft = draft(); sample = C.createSample(); demo = true; restoreDraft(null); }
@@ -209,7 +224,7 @@
     if (demo) switchView('review');
   }
 
-  $('historyList').addEventListener('click', event => {
+  $('historyList').addEventListener('click', async event => {
     const button = event.target.closest('[data-action]');
     if (!button) return;
     const row = currentState().entries.find(e => e.id === button.dataset.id);
@@ -218,14 +233,14 @@
       restoreDraft({ mood: row.mood, triggers: row.triggers, intensity: row.intensity, note: row.note, editingId: row.id });
       switchView('record'); window.scrollTo({ top: 0, behavior: 'instant' }); $('note').focus({ preventScroll: true });
     } else {
-      if (!persist({ ...currentState(), entries: currentState().entries.filter(e => e.id !== row.id) })) return;
+      if (!await persist({ ...currentState(), entries: currentState().entries.filter(e => e.id !== row.id) })) return;
       undo = { row, demo };
       renderAll(); toast(demo ? '已删除一条示例记录。' : '记录已删除，可以撤销。', true);
     }
   });
-  $('undoDelete').addEventListener('click', () => {
+  $('undoDelete').addEventListener('click', async () => {
     if (!undo || undo.demo !== demo) return;
-    if (!currentState().entries.some(e => e.id === undo.row.id) && !persist({ ...currentState(), entries: [undo.row, ...currentState().entries] })) return;
+    if (!currentState().entries.some(e => e.id === undo.row.id) && !await persist({ ...currentState(), entries: [undo.row, ...currentState().entries] })) return;
     undo = null; renderAll(); toast('记录已恢复。');
   });
 
@@ -249,12 +264,19 @@
 
   async function startActivity(id, opener) {
     stopActivity();
+    const request = activityRequest;
     const config = C.activityById(id);
     if (!config) return;
     let audio = null;
     if (id === 'rain') {
-      try { audio = makeRain(); await audio.context.resume(); }
-      catch { toast('声音暂时无法播放，请检查浏览器音频权限，或选择其他练习。'); return; }
+      try { audio = makeRain(); pendingAudio = audio; await audio.context.resume(); }
+      catch {
+        disposeAudio(audio);
+        if (request === activityRequest) { pendingAudio = null; toast('声音暂时无法播放，请检查浏览器音频权限，或选择其他练习。'); }
+        return;
+      }
+      if (request !== activityRequest) { disposeAudio(audio); return; }
+      pendingAudio = null;
     }
     activity = { id, base: 0, startedAt: Date.now(), paused: false, done: false, audio, opener, demo, entryId: currentState().entries[0]?.id || null, phase: null };
     $('activityTitle').textContent = config.title;
@@ -295,12 +317,12 @@
       return;
     }
     if (activity.id === 'breath') {
-      $('phaseHint').textContent = `第 ${progress.cycle} / 5 轮 · ${progress.phase}还剩 ${progress.phaseSeconds} 秒`;
+      $('phaseHint').textContent = `第 ${progress.cycle} / ${progress.totalCycles} 轮 · ${progress.phase}还剩 ${progress.phaseSeconds} 秒`;
       const stage = progress.cycle + progress.phase;
       if (activity.phase !== stage) {
         activity.phase = stage;
         $('phaseText').textContent = progress.phase;
-        $('practiceOrb').style.transition = `transform ${progress.phaseDuration}s ease-in-out`;
+        $('practiceOrb').style.transition = `transform ${progress.phaseRemainingMs / 1000}s ease-in-out`;
         // Start the expansion after the dialog's first layout.
         requestAnimationFrame(() => { if (activity && !activity.paused) $('practiceOrb').style.transform = progress.phase === '吸气' ? 'scale(1.18)' : 'scale(.82)'; });
       }
@@ -311,14 +333,19 @@
     }
   }
 
+  function disposeAudio(audio) {
+    if (!audio) return;
+    try { audio.source.stop(); } catch {}
+    if (audio.context.state !== 'closed') audio.context.close().catch(() => {});
+  }
+
   function closeAudio() {
-    if (!activity?.audio) return;
-    try { activity.audio.source.stop(); } catch {}
-    activity.audio.context.close().catch(() => {});
-    activity.audio = null;
+    if (activity?.audio) { disposeAudio(activity.audio); activity.audio = null; }
   }
 
   function stopActivity() {
+    activityRequest++;
+    disposeAudio(pendingAudio); pendingAudio = null;
     clearInterval(ticker); ticker = null;
     const opener = activity?.opener;
     closeAudio(); activity = null;
@@ -342,11 +369,11 @@
   });
   $('endActivity').addEventListener('click', stopActivity);
   $('activityDialog').addEventListener('cancel', event => { event.preventDefault(); stopActivity(); });
-  $('activityDialog').addEventListener('click', event => {
+  $('activityDialog').addEventListener('click', async event => {
     const button = event.target.closest('[data-feedback]');
     if (!button || !activity?.done || activity.demo !== demo) return;
     const session = { id: uid(), activityId: activity.id, feedback: button.dataset.feedback, ts: Date.now(), entryId: activity.entryId };
-    if (!persist({ ...currentState(), sessions: [session, ...currentState().sessions] })) { $('feedbackError').textContent = '反馈还没有保存成功，请重试。也可以关闭，暂时不保存。'; $('feedbackError').hidden = false; return; }
+    if (!await persist({ ...currentState(), sessions: [session, ...currentState().sessions] })) { $('feedbackError').textContent = lastSaveError || '反馈还没有保存成功，请重试。也可以关闭，暂时不保存。'; $('feedbackError').hidden = false; return; }
     const worse = session.feedback === 'worse';
     stopActivity(); renderAll();
     toast(worse ? '感受已记下。先停一停，不必继续这项练习。' : demo ? '示例反馈已记录，个人数据不受影响。' : '这段照顾自己的时间，已为你记下。');
@@ -367,13 +394,12 @@
     download({ app: '心晴日记', exportedAt: new Date().toISOString(), ...personal }, '心晴日记-备份-' + new Date().toLocaleDateString('sv-SE') + '.json');
     toast('备份已生成，请妥善保存下载的文件。');
   });
-  function clearPersonal(recovery = false) {
-    if (demo) return;
+  async function clearPersonal(recovery = false) {
+    if (demo || writing) return;
     if (!confirm(recovery ? '确认重置本地数据？请先下载原始备份。重置会删除当前版本与旧版记录。' : '确认清空全部日记和活动反馈？旧版备份也将删除。请先导出备份，此操作不能撤销。')) return;
     try {
       // Remove legacy first: interrupted cleanup must never resurrect old records.
-      storage.removeItem(C.LEGACY_KEY);
-      storage.removeItem(C.KEY);
+      await writeLock(() => { storage.removeItem(C.LEGACY_KEY); storage.removeItem(C.KEY); });
       loaded = C.loadState(storage);
       if (loaded.error) throw Error('storage blocked');
       personal = loaded.state; undo = null;
@@ -423,6 +449,14 @@
   $('clearTrigger').addEventListener('click', () => { triggerFilter = ''; historyLimit = 20; renderHistory(); });
   $('loadMore').addEventListener('click', () => { historyLimit += 20; renderHistory(); });
   window.addEventListener('hashchange', () => switchView(location.hash.slice(1)));
+  window.addEventListener('storage', event => {
+    if (event.key !== null && event.key !== C.KEY && event.key !== C.LEGACY_KEY) return;
+    loaded = C.loadState(storage);
+    if (!loaded.error) personal = loaded.state;
+    undo = null;
+    renderAll();
+    if (!demo) toast('另一个页面更新了日记，已同步。当前输入仍然保留。');
+  });
   setupForm(); updateForm(); renderAll();
   $('todayLabel').textContent = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) + ' / A LITTLE CHECK-IN';
   switchView(location.hash.slice(1));

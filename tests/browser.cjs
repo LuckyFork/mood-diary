@@ -35,6 +35,7 @@ function send(method, params = {}) {
 async function evaluate(expression) {
   const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true, userGesture: true });
   if (result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description || 'Browser evaluation failed');
+  await delay(30); // Let user-triggered Web Locks transactions finish before the next action.
   return result.result.value;
 }
 async function check(name, expression) {
@@ -95,7 +96,8 @@ async function screenshot(name) {
   await check('exiting sample restores personal record', 'document.querySelector("#historyList").textContent.includes("汇报前紧张")');
   await evaluate('document.querySelector("#historyList [data-action=edit]").click(); document.querySelector("#note").value="编辑后的记录"; document.querySelector("#saveRecord").click()');
   await check('editing preserves identity without creating duplicate entries', 'JSON.parse(localStorage.getItem("mood-diary-v2")).entries.length === 1 && JSON.parse(localStorage.getItem("mood-diary-v2")).entries[0].note === "编辑后的记录"');
-  await evaluate('document.querySelector("[data-view=review]").click(); document.querySelector("#historyList [data-action=delete]").click(); document.querySelector("#undoDelete").click()');
+  await evaluate('document.querySelector("[data-view=review]").click(); document.querySelector("#historyList [data-action=delete]").click()');
+  await evaluate('document.querySelector("#undoDelete").click()');
   await check('undo restores deleted entry', 'JSON.parse(localStorage.getItem("mood-diary-v2")).entries.length === 1');
   await evaluate('document.querySelector("[data-view=record]").click(); document.querySelector("[data-mood=low]").click(); document.querySelector("#note").value="存储失败也不能丢失"; window.originalSet=Storage.prototype.setItem; Storage.prototype.setItem=function(){throw Error("quota")}; document.querySelector("#saveRecord").click()');
   await check('failed save keeps the draft and existing records', 'document.querySelector("#note").value === "存储失败也不能丢失" && JSON.parse(localStorage.getItem("mood-diary-v2")).entries.length === 1 && !document.querySelector("#formError").hidden');
@@ -119,11 +121,52 @@ async function screenshot(name) {
   await check('rain sound starts an audio activity', 'document.querySelector("#activityDialog").open && document.querySelector("#activityTitle").textContent.includes("雨")');
   await evaluate('document.querySelector("#endActivity").click()');
 
+  await evaluate('window.RealAudioContext=window.AudioContext; window.pendingRain=[]; window.testAudios=[]; window.AudioContext=class extends window.RealAudioContext { constructor(){super();window.testAudios.push(this)} resume(){return new Promise(resolve=>window.pendingRain.push(resolve))} }; document.querySelector("[data-start=rain]").click(); document.querySelector("#sampleToggle").click(); window.pendingRain[0]()');
+  await delay(100);
+  await check('switching mode cancels pending rain startup and closes its audio', '!document.querySelector("#activityDialog").open && window.testAudios.every(a=>a.state==="closed")');
+  await evaluate('document.querySelector("#sampleToggle").click(); window.pendingRain=[]; window.testAudios=[]; document.querySelector("[data-start=rain]").click(); document.querySelector("[data-start=rain]").click(); window.pendingRain[1]()');
+  await delay(50);
+  await evaluate('window.pendingRain[0]()'); await delay(50);
+  await evaluate('document.querySelector("#endActivity").click()'); await delay(50);
+  await check('overlapping rain startups leave no orphan audio after ending', 'window.testAudios.every(a=>a.state==="closed")');
+  await evaluate('window.AudioContext=window.RealAudioContext; document.querySelector("[data-start=breath]").click(); window.realNow=Date.now; Date.now=()=>window.realNow()+3000');
+  await delay(250);
+  await evaluate('document.querySelector("#pauseActivity").click(); document.querySelector("#pauseActivity").click()');
+  await check('resumed breathing animation uses remaining phase duration', 'parseFloat(document.querySelector("#practiceOrb").style.transitionDuration)<=1.1');
+  await evaluate('document.querySelector("#endActivity").click(); Date.now=window.realNow');
+
   await evaluate('localStorage.setItem("mood-diary-v2", "null")'); await reload();
   await check('corrupt storage is surfaced without overwriting the raw data', '!document.querySelector("#storageAlert").hidden && localStorage.getItem("mood-diary-v2")==="null"');
-  await evaluate('localStorage.clear(); localStorage.setItem("mood-diary-v1",JSON.stringify([{id:123,mood:"calm",intensity:3,triggers:["工作"],note:"旧版日记",ts:Date.now()}]))'); await reload();
+  await evaluate('localStorage.clear(); localStorage.setItem("mood-diary-v1",JSON.stringify([{id:123,mood:"calm",intensity:3,triggers:["工作"],note:"旧版日记"+"长".repeat(2500),ts:Date.now()}]))'); await reload();
   await evaluate('document.querySelector("[data-view=review]").click()');
   await check('legacy diary remains visible before migration', 'document.querySelector("#historyList").textContent.includes("旧版日记") && !localStorage.getItem("mood-diary-v2")');
+  await evaluate('document.querySelector("#historyList [data-action=edit]").click()');
+  await check('legacy long note can be edited without truncation', 'document.querySelector("#note").value.length===2504 && document.querySelector("#note").maxLength>=2504');
+  await evaluate('document.querySelector("#saveRecord").click()');
+  await check('legacy long note saves in full', 'JSON.parse(localStorage.getItem("mood-diary-v2")).entries[0].note.length===2504');
+
+  await evaluate('document.querySelector("[data-view=record]").click(); document.querySelector("[data-mood=happy]").click(); document.querySelector("#note").value="当前页面的草稿"; window.other=window.open(location.href.split("#")[0]+"#record","mood-diary-peer"); void 0');
+  await delay(500);
+  await evaluate('window.other.document.querySelector("[data-mood=calm]").click(); window.other.document.querySelector("#note").value="另一个页面的记录"; window.other.document.querySelector("#saveRecord").click()');
+  await delay(200);
+  await check('another tab update keeps the local draft intact', 'document.querySelector("#note").value==="当前页面的草稿"');
+  await evaluate('document.querySelector("#saveRecord").click()');
+  await check('two tabs preserve each others saved entries', 'JSON.parse(localStorage.getItem("mood-diary-v2")).entries.length===3 && JSON.parse(localStorage.getItem("mood-diary-v2")).entries.some(e=>e.note==="另一个页面的记录")');
+  await evaluate('window.other.localStorage.removeItem("mood-diary-v1"); window.other.localStorage.removeItem("mood-diary-v2")');
+  await delay(150);
+  await evaluate('document.querySelector("[data-view=record]").click(); document.querySelector("[data-mood=calm]").click(); document.querySelector("#note").value="清空之后的新记录"; document.querySelector("#saveRecord").click()');
+  await check('another tab clearing data never resurrects old entries', 'JSON.parse(localStorage.getItem("mood-diary-v2")).entries.length===1 && JSON.parse(localStorage.getItem("mood-diary-v2")).entries[0].note==="清空之后的新记录"');
+  await evaluate('window.other.close(); document.querySelector("[data-view=review]").click()');
+
+  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: out });
+  await evaluate('document.querySelector("#dataButton").click(); document.querySelector("#exportData").click()');
+  await delay(200);
+  const backups = fs.readdirSync(out).filter(name => name.startsWith('心晴日记-备份-') && name.endsWith('.json'));
+  assert.ok(backups.length, 'exports downloadable backup');
+  const backup = JSON.parse(fs.readFileSync(path.join(out, backups.at(-1)), 'utf8'));
+  assert.equal(backup.entries[0].note, '清空之后的新记录');
+  console.log('PASS exported backup contains the personal record');
+  await evaluate('document.querySelector("#closeData").click()');
   await evaluate('document.querySelector("#sampleToggle").click()');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await screenshot('mobile-review');
@@ -133,7 +176,10 @@ async function screenshot(name) {
   await evaluate('document.querySelector("[data-view=care]").click()'); await screenshot('mobile-care');
   await check('care fits mobile width', 'document.documentElement.scrollWidth <= innerWidth');
   await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 700, deviceScaleFactor: 1, mobile: true });
-  await check('small phones do not overflow', 'document.documentElement.scrollWidth <= innerWidth');
+  for (const view of ['record', 'care', 'review']) {
+    await evaluate(`document.querySelector('[data-view="${view}"]').click()`);
+    await check('320px ' + view + ' does not overflow', 'document.documentElement.scrollWidth <= innerWidth');
+  }
   assert.deepEqual(errors, [], 'no browser runtime exceptions');
   console.log('PASS no browser runtime exceptions');
   console.log('Screenshots: ' + out);

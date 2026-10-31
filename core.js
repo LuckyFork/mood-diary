@@ -27,7 +27,9 @@
 
   function normalizeEntry(e) {
     if (!e || typeof e !== 'object' || !moodByKey(e.mood) || !Number.isInteger(e.intensity) || e.intensity < 1 || e.intensity > 5 || !Number.isFinite(e.ts) || e.ts <= 0 || !Number.isFinite(new Date(e.ts).getTime())) throw Error('记录格式不完整');
-    if (!['string', 'number'].includes(typeof e.id) || !String(e.id).length || typeof e.note !== 'string' || e.note.length > 2000 || !Array.isArray(e.triggers) || e.triggers.some(t => typeof t !== 'string' || !t.trim() || t.length > 30)) throw Error('记录内容格式有误');
+    // Historical v1 notes had no length limit. Enforce new-input limits in the form,
+    // never discard an existing journal entry during migration or export.
+    if (!['string', 'number'].includes(typeof e.id) || !String(e.id).length || typeof e.note !== 'string' || !Array.isArray(e.triggers) || e.triggers.some(t => typeof t !== 'string' || !t.trim() || t.length > 30)) throw Error('记录内容格式有误');
     return { id: String(e.id), mood: e.mood, intensity: e.intensity, triggers: [...new Set(e.triggers.map(t => t.trim()))], note: e.note, ts: e.ts };
   }
 
@@ -46,26 +48,30 @@
     const backup = {};
     try {
       const current = storage.getItem(KEY);
-      if (current !== null) {
-        backup[KEY] = current;
-        return { state: normalizeState(JSON.parse(current)), error: null, source: 'v2', backup };
-      }
       const old = storage.getItem(LEGACY_KEY);
-      if (old === null) return { state: emptyState(), error: null, source: 'empty', backup };
-      backup[LEGACY_KEY] = old;
+      const revision = { current, legacy: old };
+      if (current !== null) backup[KEY] = current;
+      if (old !== null) backup[LEGACY_KEY] = old;
+      if (current !== null) {
+        return { state: normalizeState(JSON.parse(current)), error: null, source: 'v2', backup, revision };
+      }
+      if (old === null) return { state: emptyState(), error: null, source: 'empty', backup, revision };
       const entries = JSON.parse(old);
       if (!Array.isArray(entries)) throw Error('旧版数据格式无法识别');
-      return { state: normalizeState({ version: 2, entries, sessions: [] }), error: null, source: 'v1', backup };
+      return { state: normalizeState({ version: 2, entries, sessions: [] }), error: null, source: 'v1', backup, revision };
     } catch (error) {
       return { state: emptyState(), error: '暂时无法读取本地日记。原始数据未被覆盖，请先下载备份，再尝试恢复。', source: 'error', backup };
     }
   }
 
-  function saveState(storage, state) {
+  function saveState(storage, state, expectedRevision) {
     try {
       const clean = normalizeState(state);
-      storage.setItem(KEY, JSON.stringify(clean));
-      return { ok: true, state: clean, error: null };
+      const current = storage.getItem(KEY), legacy = storage.getItem(LEGACY_KEY);
+      if (expectedRevision && (current !== expectedRevision.current || legacy !== expectedRevision.legacy)) return { ok: false, conflict: true, error: '另一个页面更新了日记，已载入最新记录。你的输入已保留，请检查后再次保存。' };
+      const serialized = JSON.stringify(clean);
+      storage.setItem(KEY, serialized);
+      return { ok: true, state: clean, error: null, revision: { current: serialized, legacy } };
     } catch (error) {
       return { ok: false, error: '未能保存到浏览器，可能是存储空间不足或权限受限。内容已保留，请重试或先导出备份。' };
     }
@@ -117,7 +123,8 @@
     const remaining = Math.max(0, Math.ceil(activity.duration - elapsed / 1000));
     if (id === 'breath') {
       const offset = elapsed % 10000;
-      return { done, remaining, fraction: Math.min(1, elapsed / 60000), phase: done ? '完成' : offset < 4000 ? '吸气' : '呼气', phaseSeconds: offset < 4000 ? Math.ceil((4000 - offset) / 1000) : Math.ceil((10000 - offset) / 1000), cycle: Math.min(5, Math.floor(elapsed / 10000) + 1), phaseDuration: offset < 4000 ? 4 : 6 };
+      const phaseRemainingMs = done ? 0 : offset < 4000 ? 4000 - offset : 10000 - offset;
+      return { done, remaining, fraction: Math.min(1, elapsed / 60000), phase: done ? '完成' : offset < 4000 ? '吸气' : '呼气', phaseSeconds: Math.ceil(phaseRemainingMs / 1000), phaseRemainingMs, cycle: Math.min(6, Math.floor(elapsed / 10000) + 1), totalCycles: 6 };
     }
     return { done, remaining, fraction: Math.min(1, elapsed / (activity.duration * 1000)), step: Math.min(4, Math.floor(elapsed / (activity.duration * 200))) };
   }

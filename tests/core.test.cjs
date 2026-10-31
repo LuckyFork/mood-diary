@@ -115,3 +115,39 @@ test('sample data is regenerated independently and never mutates personal state'
   assert.ok(b.entries.length >= 7);
   assert.ok(C.analyze(b, 7, NOW).ready);
 });
+
+test('legacy notes longer than the new input limit remain readable and exportable', () => {
+  const note = '长'.repeat(2500);
+  const s = storage({ 'mood-diary-v1': JSON.stringify([entry({ note })]) });
+  const loaded = C.loadState(s);
+  assert.equal(loaded.error, null);
+  assert.equal(loaded.state.entries[0].note.length, 2500);
+  assert.equal(C.saveState(s, loaded.state).ok, true);
+  assert.equal(C.loadState(s).state.entries[0].note.length, 2500);
+});
+
+test('stale page cannot overwrite another page records', () => {
+  const s = storage();
+  const pageA = C.loadState(s), pageB = C.loadState(s);
+  assert.equal(C.saveState(s, { ...empty(), entries: [entry({ id: 'A' })] }, pageA.revision).ok, true);
+  const result = C.saveState(s, { ...empty(), entries: [entry({ id: 'B' })] }, pageB.revision);
+  assert.equal(result.ok, false);
+  assert.equal(result.conflict, true);
+  assert.equal(C.loadState(s).state.entries[0].id, 'A');
+});
+
+test('cleared data cannot be resurrected by a stale snapshot', () => {
+  const s = storage({ 'mood-diary-v2': JSON.stringify({ ...empty(), entries: [entry()] }) });
+  const stale = C.loadState(s);
+  delete s.data['mood-diary-v2'];
+  const result = C.saveState(s, { ...stale.state, entries: [...stale.state.entries, entry({ id: '2' })] }, stale.revision);
+  assert.equal(result.ok, false);
+  assert.deepEqual(C.loadState(s).state.entries, []);
+});
+
+test('resuming breathing uses the remaining phase time and displays all six cycles', () => {
+  assert.equal(C.activityProgress('breath', 3500).phaseRemainingMs, 500);
+  assert.equal(C.activityProgress('breath', 9000).phaseRemainingMs, 1000);
+  assert.equal(C.activityProgress('breath', 50000).cycle, 6);
+  assert.equal(C.activityProgress('breath', 50000).totalCycles, 6);
+});
