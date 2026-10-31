@@ -1,0 +1,8 @@
+{
+  "name": "mood-diary",
+  "version": "2.0.0",
+  "private": true,
+  "description": "A local-first mood journal and self-care prototype",
+  "scripts": { "test": "node --test tests/core.test.cjs", "test:browser": "node tests/browser.cjs" },
+  "engines": { "node": ">=22" }
+}
