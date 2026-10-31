@@ -1,312 +1,85 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>心晴日记 · 情绪日记与自我关怀</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--ink:#2f3436;--sub:#7b8489;--line:#ece8e3;--brand:#5f9e8c;--soft:#e8f1ee}
-body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
-  background:linear-gradient(180deg,#eef6f3 0%,#faf7f4 45%,#f6f4f1 100%);
-  color:var(--ink);min-height:100vh;padding:22px 14px 60px;-webkit-font-smoothing:antialiased}
-.wrap{max-width:620px;margin:0 auto}
-header{text-align:center;margin-bottom:18px}
-h1{font-size:21px;letter-spacing:1px}
-header p{font-size:12.5px;color:var(--sub);margin-top:6px}
-.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;
-  box-shadow:0 2px 14px rgba(90,110,105,.07)}
-h2{font-size:14.5px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-h2::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--brand)}
-.moods{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
-.mood{background:#fafafa;border:1.5px solid var(--line);border-radius:12px;padding:9px 2px;
-  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
-  font-size:11px;color:var(--sub);transition:.18s}
-.mood .e{font-size:21px;line-height:1}
-.mood.on{border-color:var(--brand);background:var(--soft);color:var(--brand);font-weight:600;transform:translateY(-2px)}
-.row{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:13px;color:var(--sub)}
-input[type=range]{flex:1;accent-color:var(--brand)}
-.triggers{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
-.tag{border:1px solid var(--line);background:#fafafa;border-radius:999px;
-  padding:5px 12px;font-size:12px;color:var(--sub);cursor:pointer;transition:.15s}
-.tag.on{background:var(--brand);border-color:var(--brand);color:#fff}
-textarea{width:100%;margin-top:14px;border:1px solid var(--line);border-radius:10px;
-  padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit;outline:none;background:#fafafa}
-textarea:focus{border-color:var(--brand);background:#fff}
-button.primary{width:100%;margin-top:14px;padding:12px;border:0;border-radius:11px;
-  background:var(--brand);color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:.18s}
-button.primary:hover{opacity:.9}
-button.primary:active{transform:scale(.99)}
-button.ghost{width:100%;margin-top:12px;padding:10px;border:1px dashed var(--brand);
-  border-radius:11px;background:#fff;color:var(--brand);font-size:13px;cursor:pointer}
-.pill{font-size:11px;font-weight:400;color:var(--brand);background:var(--soft);
-  border-radius:999px;padding:2px 9px}
-.care-item{display:flex;gap:10px;font-size:13px;line-height:1.65;padding:9px 0;
-  border-bottom:1px dashed var(--line);color:#454b4d}
-.care-item:last-child{border-bottom:0}
-.care-item i{font-style:normal;color:var(--brand);font-weight:700;flex-shrink:0}
-.breath{text-align:center;padding-top:8px}
-.circle{width:110px;height:110px;border-radius:50%;margin:14px auto 10px;
-  background:radial-gradient(circle at 32% 30%,#b3ddd0,#5f9e8c);
-  transition:transform 4s ease-in-out;box-shadow:0 6px 20px rgba(95,158,140,.28)}
-#breathText{font-size:13px;color:var(--sub)}
-.bars{display:flex;align-items:flex-end;gap:10px;height:120px;
-  padding:0 4px;border-bottom:1px solid var(--line)}
-.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px}
-.col{width:60%;border-radius:5px 5px 0 0;transition:.3s}
-.bar span{font-size:13px}
-.top{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
-.top .chip{font-size:12px;background:#fdf3e7;color:#b5824a;border-radius:999px;padding:4px 11px}
-.entry{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
-.entry:last-child{border-bottom:0}
-.entry .em{font-size:22px;line-height:1.2}
-.entry .body{flex:1;min-width:0}
-.entry .meta{font-size:11.5px;color:var(--sub);display:flex;gap:8px;flex-wrap:wrap;margin-top:3px}
-.entry .note{color:#4c5254;margin-top:5px;line-height:1.6;word-break:break-word}
-.dots{display:inline-flex;gap:2px;vertical-align:middle}
-.dots i{width:4px;height:4px;border-radius:50%;background:var(--brand);opacity:.25}
-.dots i.f{opacity:1}
-.del{background:none;border:0;color:#c9cdcf;font-size:16px;cursor:pointer;padding:0 2px}
-.del:hover{color:#e08e6d}
-.empty{font-size:12.5px;color:var(--sub);text-align:center;padding:14px 0}
-.foot{font-size:11.5px;color:#a3abae;text-align:center;line-height:1.8;margin-top:6px}
-.toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);
-  background:rgba(47,52,54,.92);color:#fff;font-size:13px;padding:10px 20px;border-radius:999px;
-  opacity:0;transition:.3s;pointer-events:none}
-.toast.show{opacity:1;transform:translate(-50%,0)}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f6f5ef">
+  <meta name="description" content="记录此刻的感受，看见情绪的线索，用一个小行动照顾自己。个人日记仅保存在当前浏览器。">
+  <title>心晴日记 · 给心情一个落脚的地方</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='20' fill='%23394f43'/%3E%3Cpath d='M32 50V26M32 35C12 36 13 15 13 15s21-1 19 20M32 28C31 11 51 12 51 12s1 18-19 16' fill='%23cfdfaa' stroke='%23cfdfaa' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./core.js" defer></script>
+  <script src="./app.js" defer></script>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>心晴日记</h1>
-    <p>记录情绪 · 看见触发 · 好好照顾自己</p>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#record" aria-label="心晴日记首页">
+        <svg class="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><rect width="40" height="40" rx="13" fill="#394f43"/><path d="M20 31V17m0 6C9 23 9 12 9 12s12-1 11 11m0-6C20 8 31 9 31 9s1 10-11 10" fill="#d5e3b7" stroke="#d5e3b7" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span>心晴日记<small>A LITTLE SPACE FOR YOU</small></span>
+      </a>
+      <nav class="main-nav" role="tablist" aria-label="主要功能">
+        <button id="tab-record" role="tab" aria-controls="panel-record" aria-selected="true" data-view="record"><span aria-hidden="true">✎</span> 记录此刻</button>
+        <button id="tab-care" role="tab" aria-controls="panel-care" aria-selected="false" tabindex="-1" data-view="care"><span aria-hidden="true">☘</span> 照顾自己</button>
+        <button id="tab-review" role="tab" aria-controls="panel-review" aria-selected="false" tabindex="-1" data-view="review"><span aria-hidden="true">▥</span> 情绪回顾</button>
+      </nav>
+      <div class="header-actions">
+        <button class="text-button" id="sampleToggle">体验示例 <span aria-hidden="true">↗</span></button>
+        <button class="icon-button" id="dataButton" aria-label="数据管理" title="数据管理"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M3 4h18v4H3zM9 12h6"/></svg></button>
+      </div>
+    </div>
   </header>
 
-  <section class="card">
-    <h2>此刻你的感受是？</h2>
-    <div class="moods" id="moods"></div>
-    <div class="row">
-      <label>强度</label>
-      <input type="range" id="intensity" min="1" max="5" value="3">
-      <span id="intensityVal" style="width:14px">3</span>
-    </div>
-    <div class="triggers" id="triggers"></div>
-    <textarea id="note" rows="2" placeholder="想对自己说点什么？（选填）"></textarea>
-    <button class="primary" id="save">保存这一条</button>
-  </section>
+  <main id="main" class="page-shell">
+    <div class="sample-banner" id="sampleBanner" hidden><span><strong>正在体验示例</strong> 这里的日记和反馈均为演示内容，操作不会影响你的个人记录。</span><button id="exitSample">返回我的日记 ↗</button></div>
+    <div class="storage-alert" id="storageAlert" role="alert" hidden><p id="storageMessage"></p><div class="button-row"><button id="backupRaw" class="button small secondary">下载原始备份</button><button id="retryLoad" class="button small secondary">重新读取</button><button id="resetStorage" class="text-button danger">重置本地数据</button></div></div>
 
-  <section class="card">
-    <h2>为你推荐 <span class="pill" id="careFor">平静</span></h2>
-    <div id="careList"></div>
-    <button class="ghost" id="breathBtn">跟我呼吸 30 秒 →</button>
-    <div class="breath" id="breathBox" hidden>
-      <div class="circle" id="breathCircle"></div>
-      <p id="breathText">准备…</p>
-    </div>
-  </section>
+    <section id="panel-record" data-panel="record" role="tabpanel" aria-labelledby="tab-record">
+      <div class="page-intro">
+        <div><p class="eyebrow" id="todayLabel"></p><h1>每一种感受，<br>都值得被看见<span class="title-dot">。</span></h1><p class="intro-copy">不用组织好语言，也不必急着变好。先从此刻开始。</p></div>
+        <div class="intro-art" aria-hidden="true"><div class="art-sun"></div><svg viewBox="0 0 240 150"><path d="M9 118c29-50 52-55 79-32s37 35 57 4 54-37 85 2"/><path d="M28 136c24-28 50-21 76-3M145 129c26-26 48-22 76-10"/><path d="M122 98V59m0 14c-21 2-26-13-25-24 14 1 26 5 25 24zm0-12c19 1 29-12 26-24-17 1-26 9-26 24z"/></svg><span>给心情一个落脚的地方</span></div>
+      </div>
+      <div class="record-layout">
+        <form class="card journal-card" id="journalForm">
+          <div class="card-heading"><div><span class="section-number">01 / CHECK IN</span><h2 id="recordTitle">此刻，你的感受是？</h2></div><span class="quiet-label">只需一点点时间</span></div>
+          <fieldset class="mood-field"><legend class="sr-only">选择此刻的情绪，必选</legend><div class="mood-grid" id="moodGrid"></div></fieldset>
+          <div class="intensity-section"><div class="field-heading"><label for="intensity">这份感受有多强烈？</label><output for="intensity" id="intensityValue">3 <span>/ 5</span></output></div><input id="intensity" type="range" min="1" max="5" step="1" value="3" aria-describedby="intensityHelp"><div class="range-labels" id="intensityHelp"><span>轻轻的</span><span>很强烈</span></div></div>
+          <fieldset class="trigger-field"><legend>可能和什么有关？ <span class="optional">选填 · 可多选</span></legend><div class="trigger-grid" id="triggerGrid"></div></fieldset>
+          <div class="note-section"><label for="note">给此刻留几句话 <span class="optional">选填</span></label><textarea id="note" rows="4" maxlength="2000" placeholder="发生了什么？有什么想对自己说的？"></textarea><div class="note-bottom"><span>想到什么，就写什么。</span><span id="noteCount">0 / 2000</span></div></div>
+          <p id="formError" class="inline-error" role="alert" hidden></p>
+          <div class="save-row"><button class="button primary save-button" type="submit" id="saveRecord"><span aria-hidden="true">＋</span> 保存这一刻</button><button type="button" id="cancelEdit" class="button secondary" hidden>取消编辑</button></div>
+          <p class="form-footnote"><span aria-hidden="true">⌑</span> 日记保存在当前浏览器，只有你能在这里看到。</p>
+        </form>
+        <aside class="record-aside" aria-label="此刻的陪伴">
+          <div class="companion-card"><span class="section-number">A MOMENT FOR YOURSELF</span><div class="little-flower" aria-hidden="true">✳</div><h2 id="companionTitle">今天，也照顾一下自己</h2><p id="companionCopy">有些感受还说不清，也没关系。你可以先停一分钟，陪自己待一会儿。</p><button class="link-button" type="button" data-go="care">我想先缓一缓 <span aria-hidden="true">→</span></button></div>
+          <div class="card small-card"><div class="aside-heading"><span class="status-dot"></span><h3>慢慢记录，就很好</h3></div><p id="personalSummary">这里会慢慢收集你的感受。</p><div class="mini-stats"><div><strong id="todayCount">0</strong><span>今天的记录</span></div><div><strong id="allCount">0</strong><span>留下的片刻</span></div></div><p class="gentle-note">不用连续打卡，想起时回来就好。</p></div>
+          <div class="privacy-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><p>一个私密的小角落<span>无需登录 · 日记不上传</span></p></div>
+        </aside>
+      </div>
+    </section>
 
-  <section class="card">
-    <h2>最近 7 次情绪</h2>
-    <div id="trend"></div>
-    <div class="top" id="topTriggers"></div>
-  </section>
+    <section id="panel-care" data-panel="care" role="tabpanel" aria-labelledby="tab-care" hidden>
+      <div class="page-intro compact"><div><p class="eyebrow">02 / TAKE A LITTLE BREAK</p><h1>先照顾好，<br>此刻的自己<span class="title-dot">。</span></h1><p class="intro-copy">选一件做得到的小事。任何时候，都可以停下来。</p></div><div class="care-decoration" aria-hidden="true">✳</div></div>
+      <div class="recommendation-strip"><span class="recommend-icon" aria-hidden="true">☘</span><div><span class="section-number" id="careContext">从一个小练习开始</span><p id="careReason"></p></div></div>
+      <div class="activity-grid" id="activityGrid"></div>
+      <div class="care-bottom"><p>练习结束后，可以告诉自己：现在感觉怎么样？</p><span>不需要追求效果，愿意停一停也是一种照顾。</span></div>
+    </section>
 
-  <section class="card">
-    <h2>情绪时间线</h2>
-    <div id="timeline"></div>
-  </section>
+    <section id="panel-review" data-panel="review" role="tabpanel" aria-labelledby="tab-review" hidden>
+      <div class="review-heading"><div><p class="eyebrow">03 / LOOK BACK, GENTLY</p><h1>看见情绪的线索<span class="title-dot">。</span></h1><p class="intro-copy">感受没有好坏之分，记录帮你多了解自己一点。</p></div><div class="period-control" role="group" aria-label="回顾时间范围"><button data-days="7" aria-pressed="true">近 7 天</button><button data-days="30" aria-pressed="false">近 30 天</button></div></div>
+      <div class="stats-grid" id="reviewStats"></div>
+      <div class="review-grid"><div class="card trend-card"><div class="card-heading"><div><span class="section-number">YOUR EMOTIONAL WEATHER</span><h2>感受的起伏</h2></div><span class="quiet-label">柱高 = 感受强度</span></div><div id="trendChart"></div><p class="chart-note">按时间展示所选时段最近 12 次记录，强度从 1 到 5。</p></div><div class="card distribution-card"><span class="section-number">EVERY FEELING COUNTS</span><h2>这段时间的感受</h2><div id="moodDistribution"></div></div></div>
+      <div class="review-grid equal"><div class="card"><div class="card-heading"><div><span class="section-number">LITTLE CLUES</span><h2>感受可能与什么有关</h2></div><span class="subtle-icon" aria-hidden="true">↗</span></div><div id="triggerInsights"></div><p class="chart-note">仅反映记录中的共同出现，不代表因果关系。点击可查看对应日记。</p></div><div class="card"><div class="card-heading"><div><span class="section-number">WHAT FELT HELPFUL</span><h2>那些照顾自己的片刻</h2></div><span class="subtle-icon" aria-hidden="true">☘</span></div><div id="activityInsights"></div><p class="chart-note">来自你练习后的主观反馈，不代表疗效评估。</p></div></div>
+      <div class="card history-card"><div class="card-heading"><div><span class="section-number">YOUR JOURNAL</span><h2>写给自己的日记</h2></div><span id="historyCount" class="quiet-label"></span></div><div class="history-filters"><label class="search-field"><span aria-hidden="true">⌕</span><input id="historySearch" type="search" placeholder="搜索文字或标签" aria-label="搜索历史日记"></label><select id="historyMood" aria-label="筛选历史情绪"><option value="">全部情绪</option></select><select id="historyPeriod" aria-label="筛选历史时间"><option value="all">全部时间</option><option value="window">所选时段</option></select></div><div id="triggerFilter" class="active-filter" hidden><span></span><button id="clearTrigger" aria-label="清除因素筛选">×</button></div><div id="historyList"></div><button class="button secondary more-button" id="loadMore" hidden>查看更早的记录</button></div>
+    </section>
+    <footer class="site-footer"><span class="footer-brand">心晴日记 <span>·</span> 给自己一点温柔</span><p>个人记录仅保存在当前浏览器，清理浏览器数据或更换设备后不会同步。建议定期导出备份。<br>自我关怀练习用于日常放松，不能替代专业评估或治疗。有需要时，请寻求专业支持。</p><button class="text-button" id="footerData">数据与隐私</button><span class="version">v2.0</span></footer>
+  </main>
 
-  <p class="foot">
-    数据仅保存在你的浏览器本地，不会上传任何服务器。<br>
-    如果低落、焦虑持续两周以上并影响生活，请寻求专业心理帮助。
-  </p>
-</div>
-<div class="toast" id="toast"></div>
+  <dialog id="activityDialog" class="activity-dialog" aria-labelledby="activityTitle"><div class="dialog-inner"><div class="dialog-topline"><span class="section-number">A LITTLE TIME, JUST FOR YOU</span><button id="endActivity" class="icon-button" aria-label="结束当前活动">×</button></div><h2 id="activityTitle"></h2><p id="activityDescription" class="dialog-description"></p><div id="activePractice"><div class="practice-stage"><div id="practiceOrb" class="practice-orb" aria-hidden="true"><span id="orbSymbol">◌</span></div></div><h3 id="phaseText" aria-live="polite"></h3><p id="phaseHint"></p><p id="activityClock" class="activity-clock" role="timer" aria-live="off">01:00</p><div class="practice-track"><div id="activityProgress"></div></div><button id="pauseActivity" class="button secondary">暂停一下</button><p class="practice-caution">以舒服为准，不适时可以随时结束。</p></div><div id="feedbackArea" hidden><div class="completion-flower" aria-hidden="true">✳</div><h3>谢谢你，留了这段时间给自己</h3><p>现在的感受，有一点变化吗？</p><div class="feedback-options"><button data-feedback="better">😌<span>更轻松</span></button><button data-feedback="same">🙂<span>差不多</span></button><button data-feedback="worse">😟<span>更不舒服</span></button></div><p id="feedbackError" class="inline-error" role="alert" hidden></p><button class="text-button" data-feedback="skipped">暂时不评价，完成练习 →</button></div></div></dialog>
 
-<script>
-const KEY = 'mood-diary-v1';
-const MOODS = [
-  {key:'happy',  emoji:'😄', label:'开心', val:5, color:'#f0c04a'},
-  {key:'calm',   emoji:'😌', label:'平静', val:4, color:'#7ec8a9'},
-  {key:'tired',  emoji:'😴', label:'疲惫', val:3, color:'#9aa7c7'},
-  {key:'low',    emoji:'😔', label:'低落', val:2, color:'#8b9dc3'},
-  {key:'anxious',emoji:'😰', label:'焦虑', val:2, color:'#e0936d'},
-  {key:'angry',  emoji:'😤', label:'烦躁', val:2, color:'#d97a7a'}
-];
-const TRIGGERS = ['学业','工作','人际关系','家庭','健康','睡眠','金钱','天气','自我评价','其他'];
-const CARE = {
-  happy:  ['把这份开心写具体：发生了什么？它会成为你的「能量储蓄罐」','分享给一个朋友，快乐会翻倍','趁热打铁做一件小事，把好状态延续下去'],
-  calm:   ['保持 5 分钟正念呼吸，让身体记住这种平静','整理桌面或待办清单，秩序感会让平静更稳','给未来的自己写一句提醒'],
-  tired:  ['20 分钟小睡，或闭眼躺平不看手机','睡前 1 小时断网，把屏幕换成纸质书','泡个热水脚，让身体先于大脑放松'],
-  low:    ['出门散步 10 分钟，晒太阳是最便宜的情绪药','听 3 首「安全歌单」里的老歌','写下今天 3 件小事，哪怕只是「吃了一顿热饭」'],
-  anxious:['4-7-8 呼吸法：吸 4 秒、屏 7 秒、呼 8 秒，做 4 轮','5-4-3-2-1 接地：说出 5 个看到的、4 个摸到的、3 个听到的、2 个闻到的、1 个尝到的','把担心写成两列：能控制的 / 不能控制的，只处理左边'],
-  angry:  ['冷水洗把脸或握冰块 30 秒，让身体先降温','快走或跑 10 分钟，把肾上腺素用掉','把想说的话全写下来，但先不要发送']
-};
-
-let store = [];
-try { store = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) { store = []; }
-
-let selectedMood = null;
-const selectedTriggers = new Set();
-
-/* ---------- 渲染选择区 ---------- */
-const moodsEl = document.getElementById('moods');
-MOODS.forEach(m => {
-  const b = document.createElement('button');
-  b.className = 'mood';
-  b.innerHTML = '<span class="e">' + m.emoji + '</span><span>' + m.label + '</span>';
-  b.onclick = () => {
-    selectedMood = m.key;
-    document.querySelectorAll('.mood').forEach(x => x.classList.toggle('on', x === b));
-    renderCare();
-  };
-  moodsEl.appendChild(b);
-});
-
-const trigEl = document.getElementById('triggers');
-TRIGGERS.forEach(t => {
-  const b = document.createElement('button');
-  b.className = 'tag';
-  b.textContent = t;
-  b.onclick = () => {
-    if (selectedTriggers.has(t)) { selectedTriggers.delete(t); b.classList.remove('on'); }
-    else { selectedTriggers.add(t); b.classList.add('on'); }
-  };
-  trigEl.appendChild(b);
-});
-
-const intensity = document.getElementById('intensity');
-intensity.oninput = () => document.getElementById('intensityVal').textContent = intensity.value;
-
-/* ---------- 保存 ---------- */
-document.getElementById('save').onclick = () => {
-  if (!selectedMood) { toast('先选一个此刻的情绪吧'); return; }
-  store.unshift({
-    id: Date.now(),
-    mood: selectedMood,
-    intensity: Number(intensity.value),
-    triggers: [...selectedTriggers],
-    note: document.getElementById('note').value.trim(),
-    ts: Date.now()
-  });
-  persist();
-  selectedMood = null;
-  selectedTriggers.clear();
-  document.querySelectorAll('.mood').forEach(x => x.classList.remove('on'));
-  document.querySelectorAll('.tag').forEach(x => x.classList.remove('on'));
-  document.getElementById('note').value = '';
-  intensity.value = 3;
-  document.getElementById('intensityVal').textContent = '3';
-  renderAll();
-  toast('已记录，谢谢你愿意照顾自己 🌿');
-};
-
-function persist() {
-  try { localStorage.setItem(KEY, JSON.stringify(store.slice(0, 200))); } catch(e) {}
-}
-
-/* ---------- 趋势 ---------- */
-function renderTrend() {
-  const el = document.getElementById('trend');
-  const recent = store.slice(0, 7).reverse();
-  if (!recent.length) {
-    el.innerHTML = '<p class="empty">还没有记录，从上面选一个情绪开始吧。</p>';
-  } else {
-    el.innerHTML = '<div class="bars">' + recent.map(r => {
-      const m = MOODS.find(x => x.key === r.mood) || MOODS[1];
-      return '<div class="bar"><div class="col" style="height:' + (r.intensity * 18 + 12) +
-        'px;background:' + m.color + '"></div><span>' + m.emoji + '</span></div>';
-    }).join('') + '</div>';
-  }
-  const count = {};
-  store.forEach(r => (r.triggers || []).forEach(t => count[t] = (count[t] || 0) + 1));
-  const top = Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, 3);
-  document.getElementById('topTriggers').innerHTML = top.length
-    ? '<span style="font-size:12px;color:#7b8489">高频触发因素：</span>' +
-      top.map(t => '<span class="chip">' + t[0] + ' ×' + t[1] + '</span>').join('')
-    : '';
-}
-
-/* ---------- 时间线 ---------- */
-function fmt(ts) {
-  const d = new Date(ts), now = new Date();
-  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  if (d.toDateString() === now.toDateString()) return '今天 ' + hm;
-  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
-}
-function renderTimeline() {
-  const el = document.getElementById('timeline');
-  if (!store.length) { el.innerHTML = '<p class="empty">你的第一条情绪记录，会出现在这里。</p>'; return; }
-  el.innerHTML = store.slice(0, 20).map(r => {
-    const m = MOODS.find(x => x.key === r.mood) || MOODS[1];
-    const dots = Array.from({length: 5}, (_, i) =>
-      '<i class="' + (i < r.intensity ? 'f' : '') + '"></i>').join('');
-    const tags = (r.triggers || []).map(t => '#' + t).join(' ');
-    return '<div class="entry"><div class="em">' + m.emoji + '</div><div class="body">' +
-      '<div>' + m.label + ' <span class="dots">' + dots + '</span></div>' +
-      (r.note ? '<div class="note">' + escapeHtml(r.note) + '</div>' : '') +
-      '<div class="meta"><span>' + fmt(r.ts) + '</span>' + (tags ? '<span>' + tags + '</span>' : '') + '</div>' +
-      '</div><button class="del" data-id="' + r.id + '">×</button></div>';
-  }).join('');
-  el.querySelectorAll('.del').forEach(b => {
-    b.onclick = () => {
-      store = store.filter(x => String(x.id) !== b.dataset.id);
-      persist(); renderAll();
-    };
-  });
-}
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-/* ---------- 自我关怀 ---------- */
-function renderCare() {
-  const key = selectedMood || (store[0] && store[0].mood) || 'calm';
-  const m = MOODS.find(x => x.key === key) || MOODS[1];
-  document.getElementById('careFor').textContent = '针对「' + m.label + '」';
-  document.getElementById('careList').innerHTML = (CARE[key] || CARE.calm).map((t, i) =>
-    '<div class="care-item"><i>' + (i + 1) + '</i><span>' + t + '</span></div>').join('');
-}
-
-/* ---------- 呼吸引导 ---------- */
-let breathTimer = null;
-document.getElementById('breathBtn').onclick = () => {
-  const box = document.getElementById('breathBox');
-  box.hidden = false;
-  const circle = document.getElementById('breathCircle');
-  const txt = document.getElementById('breathText');
-  const phases = [['吸气', 4000, 1.32], ['屏息', 4000, 1.32], ['呼气', 6000, 0.82]];
-  let i = 0, cycles = 0;
-  clearTimeout(breathTimer);
-  (function step() {
-    const p = phases[i % 3];
-    txt.textContent = p[0] + ' ' + (p[1] / 1000) + ' 秒';
-    circle.style.transform = 'scale(' + p[2] + ')';
-    i++;
-    if (i % 3 === 0) cycles++;
-    if (cycles >= 3) {
-      txt.textContent = '完成，现在感觉如何？';
-      circle.style.transform = 'scale(1)';
-      return;
-    }
-    breathTimer = setTimeout(step, p[1]);
-  })();
-};
-
-/* ---------- toast ---------- */
-let toastTimer = null;
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
-}
-
-/* ---------- 初始化 ---------- */
-function renderAll() { renderTrend(); renderTimeline(); renderCare(); }
-renderAll();
-</script>
+  <dialog id="dataDialog" class="data-dialog" aria-labelledby="dataTitle"><div class="dialog-inner"><div class="dialog-topline"><span class="section-number">YOUR DATA, YOUR CHOICE</span><button id="closeData" class="icon-button" aria-label="关闭数据管理">×</button></div><h2 id="dataTitle">你的日记，由你保管</h2><p>日记和活动反馈保存在当前浏览器，不会上传到服务器。使用同一设备的其他人可能访问浏览器中的数据，请妥善保管设备。</p><p>更换设备、使用无痕模式或清理浏览器数据，可能无法找回记录。你可以下载一份 JSON 备份。</p><p id="dataModeNote" class="data-mode-note" hidden>正在体验示例，请先返回个人模式再管理个人数据。</p><div class="data-actions"><button id="exportData" class="button primary">导出我的记录 ↗</button><button id="clearData" class="button secondary danger">清空全部本地记录</button></div><p class="gentle-note">清空前会再次确认。旧版备份也会一起删除。</p></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toastMessage"></span><button id="undoDelete" hidden>撤销删除</button></div>
+  <noscript><p class="noscript">请启用 JavaScript，以使用本地日记功能。</p></noscript>
 </body>
 </html>
